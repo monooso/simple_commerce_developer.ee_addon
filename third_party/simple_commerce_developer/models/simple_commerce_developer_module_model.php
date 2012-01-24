@@ -29,6 +29,55 @@ class Simple_commerce_developer_module_model extends Simple_commerce_developer_m
 
 
   /**
+   * Returns an associative array of members. For example:
+   *
+   * array(
+   *  '11' => 'Steve Jobs',
+   *  '12' => 'Jeff Bezos'
+   * );
+   *
+   * @access  public
+   * @return  array
+   */
+  public function get_members()
+  {
+    $members = array();
+
+    $db_result = $this->EE->db->select('member_id, screen_name')
+      ->get_where('members', array('group_id >' => '4'));
+
+    if ( ! $db_result->num_rows())
+    {
+      return $members;
+    }
+
+    foreach ($db_result->result() AS $db_row)
+    {
+      $members[$db_row->member_id] = $db_row->screen_name;
+    }
+
+    return $members;
+  }
+
+
+  /**
+   * Returns an associative array of Simple Commerce products. For example:
+   *
+   * array(
+   *  '11' => 'Hat',
+   *  '12' => 'Belt'
+   * );
+   *
+   * @access  public
+   * @return  array
+   */
+  public function get_simple_commerce_products()
+  {
+    
+  }
+
+
+  /**
    * Installs the module.
    *
    * @access  public

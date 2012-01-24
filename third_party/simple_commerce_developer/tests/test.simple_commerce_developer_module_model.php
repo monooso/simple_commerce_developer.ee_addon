@@ -32,6 +32,60 @@ class Test_simple_commerce_developer_module_model extends Testee_unit_test_case 
   }
 
 
+  public function test__get_members__retrieves_members_from_database_and_returns_array()
+  {
+    $db_result = $this->_get_mock('db_query');
+
+    $db_rows = array(
+      (object) array(
+        'member_id'   => '11',
+        'screen_name' => 'Steve Jobs'
+      ),
+      (object) array(
+        'member_id'   => '12',
+        'screen_name' => 'Bill Gates'
+      )
+    );
+
+    $expected_result = array(
+      $db_rows[0]->member_id => $db_rows[0]->screen_name,
+      $db_rows[1]->member_id => $db_rows[1]->screen_name
+    );
+
+    $this->EE->db->expectOnce('select', array('member_id, screen_name'));
+    $this->EE->db->expectOnce('get_where',
+      array('members', array('group_id >' => '4')));
+
+    $this->EE->db->setReturnReference('get_where', $db_result);
+
+    $db_result->expectOnce('num_rows');
+    $db_result->setReturnValue('num_rows', count($db_rows));
+
+    $db_result->expectOnce('result');
+    $db_result->setReturnValue('result', $db_rows);
+  
+    $this->assertIdentical($expected_result, $this->_subject->get_members());
+  }
+
+
+  public function test__get_members__returns_empty_array_if_no_matching_members_in_database()
+  {
+    $db_result = $this->_get_mock('db_query');
+
+    $this->EE->db->expectOnce('select', array('member_id, screen_name'));
+    $this->EE->db->expectOnce('get_where',
+      array('members', array('group_id >' => '4')));
+
+    $this->EE->db->setReturnReference('get_where', $db_result);
+
+    $db_result->expectOnce('num_rows');
+    $db_result->setReturnValue('num_rows', 0);
+    $db_result->expectNever('result');
+
+    $this->assertIdentical(array(), $this->_subject->get_members());
+  }
+
+
   public function test__install__installs_module_and_actions()
   {
     $package_name     = 'example_package';
