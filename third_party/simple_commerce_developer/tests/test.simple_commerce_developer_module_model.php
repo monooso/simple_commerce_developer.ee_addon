@@ -32,7 +32,7 @@ class Test_simple_commerce_developer_module_model extends Testee_unit_test_case 
   }
 
 
-  public function test__get_members__retrieves_members_from_database_and_returns_array()
+  public function test__get_members__returns_an_associative_array_of_member_ids_and_screen_names()
   {
     $db_result = $this->_get_mock('db_query');
 
@@ -83,6 +83,64 @@ class Test_simple_commerce_developer_module_model extends Testee_unit_test_case 
     $db_result->expectNever('result');
 
     $this->assertIdentical(array(), $this->_subject->get_members());
+  }
+
+
+  public function test__get_simple_commerce_products__returns_an_associative_array_of_product_ids_and_titles()
+  {
+    $db_result = $this->_get_mock('db_query');
+
+    $db_rows = array(
+      (object) array('item_id' => '11', 'title' => 'Hat'),
+      (object) array('item_id' => '12', 'title' => 'Trousers')
+    );
+
+    $expected_result = array(
+      $db_rows[0]->item_id => $db_rows[0]->title,
+      $db_rows[1]->item_id => $db_rows[1]->title
+    );
+  
+    $this->EE->db->expectOnce('select',
+      array('simple_commerce_items.item_id, channel_titles.title'));
+
+    $this->EE->db->expectOnce('from', array('channel_titles'));
+    $this->EE->db->expectOnce('join', array('simple_commerce_items',
+      'simple_commerce_items.entry_id = channel_titles.entry_id'));
+
+    $this->EE->db->expectOnce('get');
+    $this->EE->db->setReturnReference('get', $db_result);
+
+    $db_result->expectOnce('num_rows');
+    $db_result->setReturnValue('num_rows', count($db_rows));
+
+    $db_result->expectOnce('result');
+    $db_result->setReturnValue('result', $db_rows);
+
+    $this->assertIdentical($expected_result,
+      $this->_subject->get_simple_commerce_products());
+  }
+
+
+  public function test__get_simple_commerce_products__returns_empty_array_if_no_products_in_database()
+  {
+    $db_result = $this->_get_mock('db_query');
+
+    $this->EE->db->expectOnce('select',
+      array('simple_commerce_items.item_id, channel_titles.title'));
+
+    $this->EE->db->expectOnce('from', array('channel_titles'));
+    $this->EE->db->expectOnce('join', array('simple_commerce_items',
+      'simple_commerce_items.entry_id = channel_titles.entry_id'));
+
+    $this->EE->db->expectOnce('get');
+    $this->EE->db->setReturnReference('get', $db_result);
+
+    $db_result->expectOnce('num_rows');
+    $db_result->setReturnValue('num_rows', 0);
+    $db_result->expectNever('result');
+
+    $this->assertIdentical(array(),
+      $this->_subject->get_simple_commerce_products());
   }
 
 

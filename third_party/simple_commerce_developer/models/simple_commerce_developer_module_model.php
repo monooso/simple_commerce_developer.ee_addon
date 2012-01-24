@@ -73,7 +73,26 @@ class Simple_commerce_developer_module_model extends Simple_commerce_developer_m
    */
   public function get_simple_commerce_products()
   {
-    
+    $products = array();
+
+    $db_result = $this->EE->db
+      ->select('simple_commerce_items.item_id, channel_titles.title')
+      ->from('channel_titles')
+      ->join('simple_commerce_items',
+          'simple_commerce_items.entry_id = channel_titles.entry_id')
+      ->get();
+
+    if ( ! $db_result->num_rows())
+    {
+      return $products;
+    }
+
+    foreach ($db_result->result() AS $db_row)
+    {
+      $products[$db_row->item_id] = $db_row->title;
+    }
+
+    return $products;
   }
 
 
