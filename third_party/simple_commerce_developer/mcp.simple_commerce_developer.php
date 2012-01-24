@@ -91,7 +91,11 @@ class Simple_commerce_developer_mcp {
     $this->EE->cp->set_variable('cp_page_title',
       $this->EE->lang->line('mod_nav_build_ipn_call'));
 
-    $vars = array();
+    $vars = array(
+      'form_action' => $this->_base_qs .AMP .'method=execute_ipn_call',
+      'members'     => $this->_mod_model->get_members(),
+      'products'    => $this->_mod_model->get_simple_commerce_products()
+    );
 
     return $this->EE->load->view('mod_build_ipn_call', $vars, TRUE);
   }
@@ -108,6 +112,7 @@ class Simple_commerce_developer_mcp {
     $lang = $this->EE->lang;
     $sess = $this->EE->session;
 
+    /*
     $this->_model->save_module_settings()
       ? $sess->set_flashdata(
           'message_success',
@@ -115,7 +120,9 @@ class Simple_commerce_developer_mcp {
       : $sess->set_flashdata(
           'message_failure',
           $lang->line('flashdata__settings_not_saved'));
+     */
 
+    $sess->set_flashdata('message_success', 'It Worked!');
     $this->EE->functions->redirect($this->_base_url);
   }
 

@@ -48,7 +48,7 @@ class Test_simple_commerce_developer_mcp extends Testee_unit_test_case {
   }
 
   
-  public function test__build_ipn_call__sets_page_title_and_loads_correct_view()
+  public function test__build_ipn_call__loads_data_from_model_and_creates_view()
   {
     $page_title = 'Example Page Title';
     $view_string = '<p>Look at the parking lot, Larry.</p>';
@@ -60,11 +60,45 @@ class Test_simple_commerce_developer_mcp extends Testee_unit_test_case {
     $this->EE->cp->expectOnce('set_variable',
       array('cp_page_title', $page_title));
 
+    // Create the form action URL.
+    $form_action = 'C=addons_modules' .AMP .'M=show_module_cp'
+      .AMP .'module=simple_commerce_developer' .AMP .'method=execute_ipn_call';
+
+    // Retrieve the members.
+    $members = array(
+      '10' => 'Steve Jobs (steve@apple.com)',
+      '20' => 'Bill Gates (bill@microsoft.com)',
+      '30' => 'Jeff Bezos (jeff@amazon.com)'
+    );
+
+    $this->_mod_model->expectOnce('get_members');
+    $this->_mod_model->setReturnValue('get_members', $members);
+
+    // Retrieve the products.
+    $products = array(
+      '11' => 'Hat',
+      '12' => 'Shirt',
+      '13' => 'Trousers',
+      '14' => 'Socks'
+    );
+
+    $this->_mod_model->expectOnce('get_simple_commerce_products');
+    $this->_mod_model->setReturnValue('get_simple_commerce_products',
+      $products);
+
+    // Build the view data.
+    $view_data = array(
+      'form_action' => $form_action,
+      'members'     => $members,
+      'products'    => $products
+    );
+
+    // Load the view.
     $this->EE->load->expectOnce('view',
-      array('mod_build_ipn_call', '*', TRUE));
+      array('mod_build_ipn_call', $view_data, TRUE));
 
     $this->EE->load->setReturnValue('view', $view_string,
-      array('mod_build_ipn_call', '*', TRUE));
+      array('mod_build_ipn_call', $view_data, TRUE));
   
     $this->assertIdentical($view_string,
       $this->_subject->build_ipn_call());
