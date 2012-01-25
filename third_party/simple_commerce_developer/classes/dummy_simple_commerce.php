@@ -24,15 +24,13 @@ class Dummy_simple_commerce extends Simple_commerce {
    */
   public function __construct()
   {
+    // We're debugging.
+    $this->debug = TRUE;
+
     // At time of writing, the Simple Commerce module is still old school.
-    if (method_exists('Simple_commerce', 'Simple_commerce'))
-    {
-      parent::Simple_commerce();
-    }
-    else
-    {
-      parent::__construct();
-    }
+    method_exists('Simple_commerce', 'Simple_commerce')
+      ? parent::Simple_commerce()
+      : parent::__construct();
   }
 
 
