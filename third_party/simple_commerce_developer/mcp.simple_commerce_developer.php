@@ -8,9 +8,12 @@
  * @package         Simple_commerce_developer
  */
 
+require_once dirname(__FILE__) .'/classes/dummy_simple_commerce.php';
+
 class Simple_commerce_developer_mcp {
 
   private $EE;
+  private $_dummy_sc;
   private $_mod_model;
   private $_theme_url;
 
@@ -23,11 +26,15 @@ class Simple_commerce_developer_mcp {
    * Constructor.
    *
    * @access  public
+   * @param   Dummy_simple_commerce   $dummy_sc   Dummy_simple_commerce mock.
    * @return  void
    */
-  public function __construct()
+  public function __construct(Dummy_simple_commerce $dummy_sc = NULL)
   {
     $this->EE =& get_instance();
+
+    // Are we faking 'til we make it?
+    $this->_dummy_sc = $dummy_sc ? $dummy_sc : new Dummy_simple_commerce();
 
     $this->EE->load->add_package_path(
       PATH_THIRD .'simple_commerce_developer/');
@@ -115,20 +122,74 @@ class Simple_commerce_developer_mcp {
    */
   public function execute_ipn_call()
   {
-    $lang = $this->EE->lang;
-    $sess = $this->EE->session;
+    // Retrieve the member ID and product ID.
+    $member_id  = $this->EE->input->post('member_id', TRUE);
+    $product_id = $this->EE->input->post('product_id', TRUE);
 
-    /*
-    $this->_model->save_module_settings()
-      ? $sess->set_flashdata(
-          'message_success',
-          $lang->line('flashdata__settings_saved'))
-      : $sess->set_flashdata(
-          'message_failure',
-          $lang->line('flashdata__settings_not_saved'));
+    $failure_message = '';
+
+    if ( ! valid_int($member_id, 1))
+    {
+      $failure_message
+        = $this->EE->lang->line('fd__execute_ipn_call__invalid_member_id');
+    }
+
+    if ( ! valid_int($product_id, 1))
+    {
+      $failure_message
+        = $this->EE->lang->line('fd__execute_ipn_call__invalid_product_id');
+    }
+
+    if ($failure_message)
+    {
+      $this->EE->session->set_flashdata('message_failure', $failure_message);
+      $this->EE->functions->redirect($this->_base_url);
+      return;     // Only really required by the tests.
+    }
+
+    // Retrieve the full product info.
+    if ( ! $product = $this->_mod_model->get_simple_commerce_product_by_item_id(
+      $product_id)
+    )
+    {
+      $this->EE->session->set_flashdata('message_failure',
+        $this->EE->lang->line('fd__execute_ipn_call__unknown_product'));
+      
+      $this->EE->functions->redirect($this->_base_url);
+      return;
+    }
+
+    // Build the IPN call.
+    if ( ! $ipn_data = $this->_mod_model->build_ipn_post_data(
+      $member_id, $product)
+    )
+    {
+      $this->EE->session->set_flashdata('message_failure',
+        $this->EE->lang->line('fd__execute_ipn_call__unable_to_build_ipn_data'));
+      
+      $this->EE->functions->redirect($this->_base_url);
+      return;
+    }
+
+    /**
+     * Behold the application of cunning. Here's what we're up to:
+     *
+     * 1. Manually set the $_POST data array to our dummy IPN data. Note that 
+     *    this is usually terribly bad form, so don't just copy it blindly.
+     * 2. Create an instance of the sub-classed Simple Commerce class, which 
+     *    overrides the IPN validation checks.
+     * 3. Call the sub-classed Simple Commerce module's "incoming_ipn" action
+     *    method directly.
+     * 4. Stand back and admire the view.
      */
 
-    $sess->set_flashdata('message_success', 'It Worked!');
+    $_POST = $ipn_data;
+    $this->_dummy_sc->incoming_ipn();
+
+    // Return the result.
+    $this->EE->session->set_flashdata('message_success',
+      $this->EE->lang->line('fd__execute_ipn_call__call_sent'));
+
     $this->EE->functions->redirect($this->_base_url);
   }
 
