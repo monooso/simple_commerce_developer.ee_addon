@@ -91,10 +91,16 @@ class Simple_commerce_developer_mcp {
     $this->EE->cp->set_variable('cp_page_title',
       $this->EE->lang->line('mod_nav_build_ipn_call'));
 
+    $products = array();
+    foreach ($this->_mod_model->get_simple_commerce_products() AS $product)
+    {
+      $products[$product->item_id] = $product->title;
+    }
+
     $vars = array(
       'form_action' => $this->_base_qs .AMP .'method=execute_ipn_call',
       'members'     => $this->_mod_model->get_members(),
-      'products'    => $this->_mod_model->get_simple_commerce_products()
+      'products'    => $products
     );
 
     return $this->EE->load->view('mod_build_ipn_call', $vars, TRUE);

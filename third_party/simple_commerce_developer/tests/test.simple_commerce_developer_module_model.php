@@ -32,6 +32,37 @@ class Test_simple_commerce_developer_module_model extends Testee_unit_test_case 
   }
 
 
+  public function test__build_ipn_post_data__returns_array_containing_member_and_product_data()
+  {
+    $member_id  = 10;
+    $product_id = 20;
+    $product    = (object) array(
+      'item_id'         => $product_id,
+      'item_regular_price' => '49.99',
+      'item_sale_price' => '34.99',
+      'item_use_sale'   => 'y',
+      'title'           => 'Hat'
+    );
+
+    // Retrieve the Simple Commerce settings.
+    $paypal_account = 'paypal.seller@testingcorp.com';
+
+    $this->EE->config->expectOnce('item', array('sc_paypal_account'));
+    $this->EE->config->setReturnValue('item', $paypal_account,
+      array('sc_paypal_account'));
+
+    // Make the call.
+    $result = $this->_subject->build_ipn_post_data($member_id, $product);
+    $purchase_date = date('H:i:s M j, Y T');
+
+    $this->assertIdentical($member_id, $result['custom']);
+    $this->assertIdentical($product->item_sale_price, $result['mc_gross']);
+    $this->assertIdentical($purchase_date, $result['payment_date']);
+    $this->assertIdentical($product->item_id, $result['item_number']);
+    $this->assertIdentical($paypal_account, $result['receiver_email']);
+  }
+
+
   public function test__get_members__returns_an_associative_array_of_member_ids_and_screen_names()
   {
     $db_result = $this->_get_mock('db_query');
@@ -86,23 +117,79 @@ class Test_simple_commerce_developer_module_model extends Testee_unit_test_case 
   }
 
 
+  public function test__get_simple_commerce_product_by_item_id__returns_product_as_object()
+  {
+    $item_id    = 11;
+    $db_result  = $this->_get_mock('db_query');
+
+    $db_rows = array(
+      (object) array(
+        'item_id'           => strval($item_id),
+        'item_regular_price' => '49.99',
+        'item_sale_price'   => '34.99',
+        'item_use_sale'     => 'y',
+        'title'             => 'Hat'
+      )
+    );
+
+    $expected_result = $db_rows[0];
+
+    $select_fields = array('simple_commerce_items.item_id',
+      'simple_commerce_items.item_regular_price',
+      'simple_commerce_items.item_sale_price',
+      'simple_commerce_items.item_use_sale',
+      'channel_titles.title'
+    );
+  
+    $this->EE->db->expectOnce('select', array(implode(', ', $select_fields)));
+    $this->EE->db->expectOnce('from', array('channel_titles'));
+    $this->EE->db->expectOnce('join', array('simple_commerce_items',
+      'simple_commerce_items.entry_id = channel_titles.entry_id'));
+
+    $this->EE->db->expectOnce('where', array(array('item_id' => $item_id)));
+    $this->EE->db->expectOnce('get');
+    $this->EE->db->setReturnReference('get', $db_result);
+
+    $db_result->setReturnValue('num_rows', count($db_rows));
+    $db_result->expectOnce('result');
+    $db_result->setReturnValue('result', $db_rows);
+
+    $this->assertIdentical($expected_result,
+      $this->_subject->get_simple_commerce_products());
+  }
+
+
   public function test__get_simple_commerce_products__returns_an_associative_array_of_product_ids_and_titles()
   {
     $db_result = $this->_get_mock('db_query');
 
     $db_rows = array(
-      (object) array('item_id' => '11', 'title' => 'Hat'),
-      (object) array('item_id' => '12', 'title' => 'Trousers')
+      (object) array(
+        'item_id'           => '11',
+        'item_regular_price' => '49.99',
+        'item_sale_price'   => '34.99',
+        'item_use_sale'     => 'y',
+        'title'             => 'Hat'
+      ),
+      (object) array(
+        'item_id'           => '12',
+        'item_regular_price' => '19.99',
+        'item_sale_price'   => '14.99',
+        'item_use_sale'     => 'n',
+        'title'             => 'Trousers'
+      )
     );
 
-    $expected_result = array(
-      $db_rows[0]->item_id => $db_rows[0]->title,
-      $db_rows[1]->item_id => $db_rows[1]->title
+    $expected_result = $db_rows;
+
+    $select_fields = array('simple_commerce_items.item_id',
+      'simple_commerce_items.item_regular_price',
+      'simple_commerce_items.item_sale_price',
+      'simple_commerce_items.item_use_sale',
+      'channel_titles.title'
     );
   
-    $this->EE->db->expectOnce('select',
-      array('simple_commerce_items.item_id, channel_titles.title'));
-
+    $this->EE->db->expectOnce('select', array(implode(', ', $select_fields)));
     $this->EE->db->expectOnce('from', array('channel_titles'));
     $this->EE->db->expectOnce('join', array('simple_commerce_items',
       'simple_commerce_items.entry_id = channel_titles.entry_id'));
@@ -110,11 +197,58 @@ class Test_simple_commerce_developer_module_model extends Testee_unit_test_case 
     $this->EE->db->expectOnce('get');
     $this->EE->db->setReturnReference('get', $db_result);
 
-    $db_result->expectOnce('num_rows');
     $db_result->setReturnValue('num_rows', count($db_rows));
-
     $db_result->expectOnce('result');
     $db_result->setReturnValue('result', $db_rows);
+
+    $this->assertIdentical($expected_result,
+      $this->_subject->get_simple_commerce_products());
+  }
+
+
+  public function test__get_simple_commerce_products__caches_result()
+  {
+    $db_result = $this->_get_mock('db_query');
+
+    $db_rows = array(
+      (object) array(
+        'item_id'           => '11',
+        'item_regular_price' => '49.99',
+        'item_sale_price'   => '34.99',
+        'item_use_sale'     => 'y',
+        'title'             => 'Hat'
+      ),
+      (object) array(
+        'item_id'           => '12',
+        'item_regular_price' => '19.99',
+        'item_sale_price'   => '14.99',
+        'item_use_sale'     => 'n',
+        'title'             => 'Trousers'
+      )
+    );
+
+    $expected_result = $db_rows;
+
+    $select_fields = array('simple_commerce_items.item_id',
+      'simple_commerce_items.item_regular_price',
+      'simple_commerce_items.item_sale_price',
+      'simple_commerce_items.item_use_sale',
+      'channel_titles.title'
+    );
+  
+    $this->EE->db->expectOnce('select');
+    $this->EE->db->expectOnce('from');
+    $this->EE->db->expectOnce('join');
+    $this->EE->db->expectOnce('get');
+    $this->EE->db->setReturnReference('get', $db_result);
+
+    $db_result->setReturnValue('num_rows', count($db_rows));
+    $db_result->expectOnce('result');
+    $db_result->setReturnValue('result', $db_rows);
+
+    // Two calls should result in a single DB call.
+    $this->assertIdentical($expected_result,
+      $this->_subject->get_simple_commerce_products());
 
     $this->assertIdentical($expected_result,
       $this->_subject->get_simple_commerce_products());
@@ -125,19 +259,14 @@ class Test_simple_commerce_developer_module_model extends Testee_unit_test_case 
   {
     $db_result = $this->_get_mock('db_query');
 
-    $this->EE->db->expectOnce('select',
-      array('simple_commerce_items.item_id, channel_titles.title'));
-
-    $this->EE->db->expectOnce('from', array('channel_titles'));
-    $this->EE->db->expectOnce('join', array('simple_commerce_items',
-      'simple_commerce_items.entry_id = channel_titles.entry_id'));
-
+    $this->EE->db->expectOnce('select');
+    $this->EE->db->expectOnce('from');
+    $this->EE->db->expectOnce('join');
     $this->EE->db->expectOnce('get');
     $this->EE->db->setReturnReference('get', $db_result);
 
-    $db_result->expectOnce('num_rows');
     $db_result->setReturnValue('num_rows', 0);
-    $db_result->expectNever('result');
+    $db_result->setReturnValue('result', array());
 
     $this->assertIdentical(array(),
       $this->_subject->get_simple_commerce_products());

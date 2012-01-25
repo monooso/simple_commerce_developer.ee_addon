@@ -19,23 +19,6 @@ class Simple_commerce_developer_model extends CI_Model {
 
 
   /* --------------------------------------------------------------
-   * PRIVATE METHODS
-   * ------------------------------------------------------------ */
-
-  /**
-   * Returns a references to the package cache. Should be called
-   * as follows: $cache =& $this->_get_package_cache();
-   *
-   * @access  private
-   * @return  array
-   */
-  protected function &_get_package_cache()
-  {
-    return $this->EE->session->cache[$this->_namespace][$this->_package_name];
-  }
-
-
-  /* --------------------------------------------------------------
   * PUBLIC METHODS
   * ------------------------------------------------------------ */
 
@@ -185,6 +168,24 @@ class Simple_commerce_developer_model extends CI_Model {
 
       Omnilogger::log($omnilog_entry);
     }
+  }
+
+
+
+  /* --------------------------------------------------------------
+   * PROTECTED METHODS
+   * ------------------------------------------------------------ */
+
+  /**
+   * Returns a references to the package cache. Should be called
+   * as follows: $cache =& $this->_get_package_cache();
+   *
+   * @access  private
+   * @return  array
+   */
+  protected function &_get_package_cache()
+  {
+    return $this->EE->session->cache[$this->_namespace][$this->_package_name];
   }
 
 

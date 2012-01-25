@@ -76,11 +76,23 @@ class Test_simple_commerce_developer_mcp extends Testee_unit_test_case {
 
     // Retrieve the products.
     $products = array(
-      '11' => 'Hat',
-      '12' => 'Shirt',
-      '13' => 'Trousers',
-      '14' => 'Socks'
+      (object) array(
+        'item_id'           => '11',
+        'item_regular_price' => '49.99',
+        'item_sale_price'   => '39.99',
+        'item_use_sale'     => 'y',
+        'title'             => 'Hat'
+      ),
+      (object) array(
+        'item_id'           => '12',
+        'item_regular_price' => '19.99',
+        'item_sale_price'   => '14.99',
+        'item_use_sale'     => 'n',
+        'title'             => 'Shirt'
+      )
     );
+
+    $view_products = array('11' => 'Hat', '12' => 'Shirt');
 
     $this->_mod_model->expectOnce('get_simple_commerce_products');
     $this->_mod_model->setReturnValue('get_simple_commerce_products',
@@ -90,7 +102,7 @@ class Test_simple_commerce_developer_mcp extends Testee_unit_test_case {
     $view_data = array(
       'form_action' => $form_action,
       'members'     => $members,
-      'products'    => $products
+      'products'    => $view_products
     );
 
     // Load the view.
