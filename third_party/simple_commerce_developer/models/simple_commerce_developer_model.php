@@ -6,7 +6,7 @@
  * @author          Stephen Lewis (http://github.com/experience/)
  * @copyright       Experience Internet
  * @package         Simple_commerce_developer
- * @version         0.1.0
+ * @version         1.0.0
  */
 
 class Simple_commerce_developer_model extends CI_Model {
@@ -16,23 +16,6 @@ class Simple_commerce_developer_model extends CI_Model {
   protected $_package_name;
   protected $_package_version;
   protected $_site_id;
-
-
-  /* --------------------------------------------------------------
-   * PRIVATE METHODS
-   * ------------------------------------------------------------ */
-
-  /**
-   * Returns a references to the package cache. Should be called
-   * as follows: $cache =& $this->_get_package_cache();
-   *
-   * @access  private
-   * @return  array
-   */
-  protected function &_get_package_cache()
-  {
-    return $this->EE->session->cache[$this->_namespace][$this->_package_name];
-  }
 
 
   /* --------------------------------------------------------------
@@ -68,7 +51,7 @@ class Simple_commerce_developer_model extends CI_Model {
       ? strtolower($package_name) : 'simple_commerce_developer';
 
     $this->_package_version = $package_version
-      ? $package_version : '0.1.0';
+      ? $package_version : '1.0.0';
 
     // Initialise the add-on cache.
     if ( ! array_key_exists($this->_namespace, $this->EE->session->cache))
@@ -185,6 +168,24 @@ class Simple_commerce_developer_model extends CI_Model {
 
       Omnilogger::log($omnilog_entry);
     }
+  }
+
+
+
+  /* --------------------------------------------------------------
+   * PROTECTED METHODS
+   * ------------------------------------------------------------ */
+
+  /**
+   * Returns a references to the package cache. Should be called
+   * as follows: $cache =& $this->_get_package_cache();
+   *
+   * @access  private
+   * @return  array
+   */
+  protected function &_get_package_cache()
+  {
+    return $this->EE->session->cache[$this->_namespace][$this->_package_name];
   }
 
 

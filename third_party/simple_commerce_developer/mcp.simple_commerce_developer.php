@@ -91,7 +91,17 @@ class Simple_commerce_developer_mcp {
     $this->EE->cp->set_variable('cp_page_title',
       $this->EE->lang->line('mod_nav_build_ipn_call'));
 
-    $vars = array();
+    $products = array();
+    foreach ($this->_mod_model->get_simple_commerce_products() AS $product)
+    {
+      $products[$product->item_id] = $product->title;
+    }
+
+    $vars = array(
+      'form_action' => $this->_base_qs .AMP .'method=execute_ipn_call',
+      'members'     => $this->_mod_model->get_members(),
+      'products'    => $products
+    );
 
     return $this->EE->load->view('mod_build_ipn_call', $vars, TRUE);
   }
@@ -105,18 +115,70 @@ class Simple_commerce_developer_mcp {
    */
   public function execute_ipn_call()
   {
-    $lang = $this->EE->lang;
-    $sess = $this->EE->session;
+    // Retrieve the member ID and product ID.
+    $member_id  = $this->EE->input->post('member_id', TRUE);
+    $product_id = $this->EE->input->post('product_id', TRUE);
 
-    $this->_model->save_module_settings()
-      ? $sess->set_flashdata(
-          'message_success',
-          $lang->line('flashdata__settings_saved'))
-      : $sess->set_flashdata(
-          'message_failure',
-          $lang->line('flashdata__settings_not_saved'));
+    $failure_message = '';
 
-    $this->EE->functions->redirect($this->_base_url);
+    if ( ! valid_int($member_id, 1))
+    {
+      $failure_message = str_replace('$member_id', $member_id,
+        $this->EE->lang->line('fd__execute_ipn_call__invalid_member_id'));
+    }
+
+    if ( ! valid_int($product_id, 1))
+    {
+      $failure_message = str_replace('$product_id', $product_id,
+        $this->EE->lang->line('fd__execute_ipn_call__invalid_product_id'));
+    }
+
+    if ($failure_message)
+    {
+      $this->EE->session->set_flashdata('message_failure', $failure_message);
+      $this->EE->functions->redirect($this->_base_url);
+      return;     // Only really required by the tests.
+    }
+
+    // Retrieve the full product info.
+    if ( ! $product = $this->_mod_model->get_simple_commerce_product_by_item_id(
+      $product_id)
+    )
+    {
+      $message = str_replace('$product_id', $product_id,
+        $this->EE->lang->line('fd__execute_ipn_call__unknown_product'));
+
+      $this->EE->session->set_flashdata('message_failure', $message);
+      $this->EE->functions->redirect($this->_base_url);
+      return;
+    }
+
+    // Build the IPN call.
+    if ( ! $ipn_data = $this->_mod_model->build_ipn_post_data(
+      $member_id, $product)
+    )
+    {
+      $this->EE->session->set_flashdata('message_failure',
+        $this->EE->lang->line('fd__execute_ipn_call__unable_to_build_ipn_data'));
+      
+      $this->EE->functions->redirect($this->_base_url);
+      return;
+    }
+
+    if ($this->_mod_model->execute_ipn_call($ipn_data))
+    {
+      $this->EE->session->set_flashdata('message_success',
+        $this->EE->lang->line('fd__execute_ipn_call__call_successful'));
+
+      $this->EE->functions->redirect($this->_base_url);
+    }
+    else
+    {
+      $this->EE->session->set_flashdata('message_failure',
+        $this->EE->lang->line('fd__execute_ipn_call__call_not_successful'));
+
+      $this->EE->functions->redirect($this->_base_url);
+    }
   }
 
 

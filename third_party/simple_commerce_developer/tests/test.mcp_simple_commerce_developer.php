@@ -31,10 +31,10 @@ class Test_simple_commerce_developer_mcp extends Testee_unit_test_case {
   {
     parent::setUp();
 
-    // Generate the mock model.
+    // Generate the mocks.
     Mock::generate('Simple_commerce_developer_module_model',
       get_class($this) .'_mock_module_model');
-    
+
     /**
      * The subject loads the models using $this->EE->load->model().
      * Because the Loader class is mocked, that does nothing, so we
@@ -48,7 +48,7 @@ class Test_simple_commerce_developer_mcp extends Testee_unit_test_case {
   }
 
   
-  public function test__build_ipn_call__sets_page_title_and_loads_correct_view()
+  public function test__build_ipn_call__loads_data_from_model_and_creates_view()
   {
     $page_title = 'Example Page Title';
     $view_string = '<p>Look at the parking lot, Larry.</p>';
@@ -60,14 +60,283 @@ class Test_simple_commerce_developer_mcp extends Testee_unit_test_case {
     $this->EE->cp->expectOnce('set_variable',
       array('cp_page_title', $page_title));
 
+    // Create the form action URL.
+    $form_action = 'C=addons_modules' .AMP .'M=show_module_cp'
+      .AMP .'module=simple_commerce_developer' .AMP .'method=execute_ipn_call';
+
+    // Retrieve the members.
+    $members = array(
+      '10' => 'Steve Jobs (steve@apple.com)',
+      '20' => 'Bill Gates (bill@microsoft.com)',
+      '30' => 'Jeff Bezos (jeff@amazon.com)'
+    );
+
+    $this->_mod_model->expectOnce('get_members');
+    $this->_mod_model->setReturnValue('get_members', $members);
+
+    // Retrieve the products.
+    $products = array(
+      (object) array(
+        'item_id'           => '11',
+        'item_regular_price' => '49.99',
+        'item_sale_price'   => '39.99',
+        'item_use_sale'     => 'y',
+        'title'             => 'Hat'
+      ),
+      (object) array(
+        'item_id'           => '12',
+        'item_regular_price' => '19.99',
+        'item_sale_price'   => '14.99',
+        'item_use_sale'     => 'n',
+        'title'             => 'Shirt'
+      )
+    );
+
+    $view_products = array('11' => 'Hat', '12' => 'Shirt');
+
+    $this->_mod_model->expectOnce('get_simple_commerce_products');
+    $this->_mod_model->setReturnValue('get_simple_commerce_products',
+      $products);
+
+    // Build the view data.
+    $view_data = array(
+      'form_action' => $form_action,
+      'members'     => $members,
+      'products'    => $view_products
+    );
+
+    // Load the view.
     $this->EE->load->expectOnce('view',
-      array('mod_build_ipn_call', '*', TRUE));
+      array('mod_build_ipn_call', $view_data, TRUE));
 
     $this->EE->load->setReturnValue('view', $view_string,
-      array('mod_build_ipn_call', '*', TRUE));
+      array('mod_build_ipn_call', $view_data, TRUE));
   
     $this->assertIdentical($view_string,
       $this->_subject->build_ipn_call());
+  }
+
+
+  public function test__execute_ipn_call__makes_dummy_ipn_call()
+  {
+    $member_id  = '10';
+    $product_id = '20';
+
+    // Retrieve the POST data.
+    $this->EE->input->expectCallCount('post', 2);
+
+    $this->EE->input->setReturnValue('post', $member_id,
+      array('member_id', TRUE));
+
+    $this->EE->input->setReturnValue('post', $product_id,
+      array('product_id', TRUE));
+
+    // Retrieve the product.
+    $product = (object) array(
+      'item_id'         => '20',
+      'item_regular_price' => '49.99',
+      'item_sale_price' => '34.99',
+      'item_use_sale'   => 'y',
+      'title'           => 'Hat'
+    );
+
+    $this->_mod_model->expectOnce('get_simple_commerce_product_by_item_id',
+      array($product_id));
+
+    $this->_mod_model->setReturnValue('get_simple_commerce_product_by_item_id',
+      $product);
+
+    // Build the IPN post data.
+    $ipn_data = array('a' => 'b', 'c' => 'd');    // Could be anything.
+
+    $this->_mod_model->expectOnce('build_ipn_post_data',
+      array($member_id, $product));
+
+    $this->_mod_model->setReturnValue('build_ipn_post_data', $ipn_data);
+    $this->_mod_model->expectOnce('execute_ipn_call', array($ipn_data));
+    $this->_mod_model->setReturnValue('execute_ipn_call', TRUE);
+
+    // Huzzah!
+    $message = 'Success!';
+
+    $this->EE->lang->setReturnValue('line', $message,
+      array('fd__execute_ipn_call__call_successful'));
+
+    $this->EE->session->expectOnce('set_flashdata',
+      array('message_success', $message));
+
+    // Redirect.
+    $this->EE->functions->expectOnce('redirect');
+
+    // Run the tests.
+    $this->_subject->execute_ipn_call();
+  }
+
+
+  public function test__execute_ipn_call__fails_with_invalid_member_id()
+  {
+    $this->EE->input->setReturnValue('post', FALSE, array('member_id', TRUE));
+    $this->EE->input->setReturnValue('post', '10', array('product_id', TRUE));
+
+    $this->_mod_model->expectNever('get_simple_commerce_product_by_item_id');
+    $this->_mod_model->expectNever('build_ipn_post_data');
+    $this->_mod_model->expectNever('execute_ipn_call');
+
+    $message = 'Failure.';
+
+    $this->EE->lang->setReturnValue('line', $message,
+      array('fd__execute_ipn_call__invalid_member_id'));
+
+    $this->EE->session->expectOnce('set_flashdata',
+      array('message_failure', $message));
+
+    $this->EE->functions->expectOnce('redirect');
+
+    $this->_subject->execute_ipn_call();
+  }
+
+
+  public function test__execute_ipn_call__fails_with_invalid_product_id()
+  {
+    $this->EE->input->setReturnValue('post', '10', array('member_id', TRUE));
+    $this->EE->input->setReturnValue('post', FALSE, array('product_id', TRUE));
+
+    $this->_mod_model->expectNever('get_simple_commerce_product_by_item_id');
+    $this->_mod_model->expectNever('build_ipn_post_data');
+    $this->_mod_model->expectNever('execute_ipn_call');
+
+    $message = 'Failure.';
+
+    $this->EE->lang->setReturnValue('line', $message,
+      array('fd__execute_ipn_call__invalid_product_id'));
+
+    $this->EE->session->expectOnce('set_flashdata',
+      array('message_failure', $message));
+
+    $this->EE->functions->expectOnce('redirect');
+
+    $this->_subject->execute_ipn_call();
+  }
+
+
+  public function test__execute_ipn_call__fails_with_unknown_product()
+  {
+    $member_id  = '10';
+    $product_id = '20';
+
+    $this->EE->input->setReturnValue('post', $member_id,
+      array('member_id', TRUE));
+
+    $this->EE->input->setReturnValue('post', $product_id,
+      array('product_id', TRUE));
+
+    $this->_mod_model->expectOnce('get_simple_commerce_product_by_item_id');
+    $this->_mod_model->setReturnValue('get_simple_commerce_product_by_item_id',
+      NULL);
+
+    $this->_mod_model->expectNever('build_ipn_post_data');
+    $this->_mod_model->expectNever('execute_ipn_call');
+
+    $message = 'Failure.';
+
+    $this->EE->lang->setReturnValue('line', $message,
+      array('fd__execute_ipn_call__unknown_product'));
+
+    $this->EE->session->expectOnce('set_flashdata',
+      array('message_failure', $message));
+
+    $this->EE->functions->expectOnce('redirect');
+
+    $this->_subject->execute_ipn_call();
+  }
+
+
+  public function test__execute_ipn_call__fails_if_unable_to_build_ipn_data()
+  {
+    $member_id  = '10';
+    $product_id = '20';
+
+    $this->EE->input->setReturnValue('post', $member_id,
+      array('member_id', TRUE));
+
+    $this->EE->input->setReturnValue('post', $product_id,
+      array('product_id', TRUE));
+
+    $product = (object) array(
+      'item_id'         => '20',
+      'item_regular_price' => '49.99',
+      'item_sale_price' => '34.99',
+      'item_use_sale'   => 'y',
+      'title'           => 'Hat'
+    );
+
+    $this->_mod_model->expectOnce('get_simple_commerce_product_by_item_id');
+    $this->_mod_model->setReturnValue('get_simple_commerce_product_by_item_id',
+      $product);
+
+    $this->_mod_model->expectOnce('build_ipn_post_data');
+    $this->_mod_model->setReturnValue('build_ipn_post_data', FALSE);
+    $this->_mod_model->expectNever('execute_ipn_call');
+
+    $message = 'Failure.';
+
+    $this->EE->lang->setReturnValue('line', $message,
+      array('fd__execute_ipn_call__unable_to_build_ipn_data'));
+
+    $this->EE->session->expectOnce('set_flashdata',
+      array('message_failure', $message));
+
+    $this->EE->functions->expectOnce('redirect');
+
+    $this->_subject->execute_ipn_call();
+  }
+
+
+  public function test__execute_ipn_call__fails_if_model_ipn_call_returns_false()
+  {
+    $member_id  = '10';
+    $product_id = '20';
+
+    $this->EE->input->setReturnValue('post', $member_id,
+      array('member_id', TRUE));
+
+    $this->EE->input->setReturnValue('post', $product_id,
+      array('product_id', TRUE));
+
+    $product = (object) array(
+      'item_id'         => '20',
+      'item_regular_price' => '49.99',
+      'item_sale_price' => '34.99',
+      'item_use_sale'   => 'y',
+      'title'           => 'Hat'
+    );
+
+    $this->_mod_model->expectOnce('get_simple_commerce_product_by_item_id');
+    $this->_mod_model->setReturnValue('get_simple_commerce_product_by_item_id',
+      $product);
+
+    $ipn_data = array('a' => 'b', 'c' => 'd');    // Could be anything.
+
+    $this->_mod_model->expectOnce('build_ipn_post_data',
+      array($member_id, $product));
+
+    $this->_mod_model->setReturnValue('build_ipn_post_data', $ipn_data);
+    $this->_mod_model->expectOnce('execute_ipn_call', array($ipn_data));
+    $this->_mod_model->setReturnValue('execute_ipn_call', FALSE);
+
+    // Boo!
+    $message = 'Failure!';
+
+    $this->EE->lang->setReturnValue('line', $message,
+      array('fd__execute_ipn_call__call_not_successful'));
+
+    $this->EE->session->expectOnce('set_flashdata',
+      array('message_failure', $message));
+
+    // Redirect.
+    $this->EE->functions->expectOnce('redirect');
+
+    $this->_subject->execute_ipn_call();
   }
 
 
