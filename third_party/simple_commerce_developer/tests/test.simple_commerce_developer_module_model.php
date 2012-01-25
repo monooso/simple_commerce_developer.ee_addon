@@ -12,6 +12,9 @@ require_once PATH_THIRD .'simple_commerce_developer/models/simple_commerce_devel
 
 class Test_simple_commerce_developer_module_model extends Testee_unit_test_case {
 
+  private $_namespace;
+  private $_package_name;
+  private $_package_version;
   private $_subject;
 
 
@@ -28,16 +31,21 @@ class Test_simple_commerce_developer_module_model extends Testee_unit_test_case 
   public function setUp()
   {
     parent::setUp();
-    $this->_subject = new Simple_commerce_developer_module_model();
+
+    $this->_namespace       = 'com.google';
+    $this->_package_name    = 'example_package';
+    $this->_package_version = '1.0.0';
+
+    $this->_subject = new Simple_commerce_developer_module_model(
+      $this->_package_name, $this->_package_version, $this->_namespace);
   }
 
 
   public function test__build_ipn_post_data__returns_array_containing_member_and_product_data()
   {
     $member_id  = 10;
-    $product_id = 20;
     $product    = (object) array(
-      'item_id'         => $product_id,
+      'item_id'         => '20',
       'item_regular_price' => '49.99',
       'item_sale_price' => '34.99',
       'item_use_sale'   => 'y',
@@ -60,6 +68,84 @@ class Test_simple_commerce_developer_module_model extends Testee_unit_test_case 
     $this->assertIdentical($purchase_date, $result['payment_date']);
     $this->assertIdentical($product->item_id, $result['item_number']);
     $this->assertIdentical($paypal_account, $result['receiver_email']);
+  }
+
+
+  public function test__build_ipn_post_data__returns_false_if_member_id_is_invalid()
+  {
+    $member_id  = 'NaN';
+    $product    = (object) array(
+      'item_id'         => '20',
+      'item_regular_price' => '49.99',
+      'item_sale_price' => '34.99',
+      'item_use_sale'   => 'y',
+      'title'           => 'Hat'
+    );
+
+    $this->EE->config->expectNever('item');
+
+    $this->assertIdentical(FALSE,
+      $this->_subject->build_ipn_post_data($member_id, $product));
+  }
+
+
+  public function test__build_ipn_post_data__returns_false_if_product_does_not_contain_required_data()
+  {
+    // NOTE: This is a bit flaky. Should really be using a custom datatype.
+    $member_id  = 10;
+    $product    = (object) array(
+      'item_id'         => '20',
+      'item_regular_price' => '49.99',
+      'item_sale_price' => '34.99',
+      'item_use_sale'   => 'y',
+      'title'           => 'Hat'
+    );
+
+    $product_a = clone $product;
+    unset($product_a->item_id);
+
+    $product_b = clone $product;
+    unset($product_b->item_regular_price);
+
+    $product_c = clone $product;
+    unset($product_c->item_sale_price);
+
+    $product_d = clone $product;
+    unset($product_d->item_use_sale);
+
+    $this->EE->config->expectNever('item');
+
+    $this->assertIdentical(FALSE,
+      $this->_subject->build_ipn_post_data($member_id, $product_a));
+
+    $this->assertIdentical(FALSE,
+      $this->_subject->build_ipn_post_data($member_id, $product_b));
+
+    $this->assertIdentical(FALSE,
+      $this->_subject->build_ipn_post_data($member_id, $product_c));
+
+    $this->assertIdentical(FALSE,
+      $this->_subject->build_ipn_post_data($member_id, $product_d));
+  }
+
+
+  public function test__build_ipn_post_data__returns_false_if_sc_paypal_account_is_not_set()
+  {
+    $member_id  = 10;
+    $product    = (object) array(
+      'item_id'         => '20',
+      'item_regular_price' => '49.99',
+      'item_sale_price' => '34.99',
+      'item_use_sale'   => 'y',
+      'title'           => 'Hat'
+    );
+
+    $this->EE->config->expectOnce('item', array('sc_paypal_account'));
+    $this->EE->config->setReturnValue('item', FALSE,
+      array('sc_paypal_account'));
+
+    $this->assertIdentical(FALSE,
+      $this->_subject->build_ipn_post_data($member_id, $product));
   }
 
 
@@ -146,16 +232,88 @@ class Test_simple_commerce_developer_module_model extends Testee_unit_test_case 
     $this->EE->db->expectOnce('join', array('simple_commerce_items',
       'simple_commerce_items.entry_id = channel_titles.entry_id'));
 
-    $this->EE->db->expectOnce('where', array(array('item_id' => $item_id)));
+    $this->EE->db->expectOnce('where', array('item_id', $item_id));
     $this->EE->db->expectOnce('get');
     $this->EE->db->setReturnReference('get', $db_result);
 
     $db_result->setReturnValue('num_rows', count($db_rows));
-    $db_result->expectOnce('result');
-    $db_result->setReturnValue('result', $db_rows);
+    $db_result->expectOnce('row');
+    $db_result->setReturnValue('row', $db_rows[0]);
 
     $this->assertIdentical($expected_result,
-      $this->_subject->get_simple_commerce_products());
+      $this->_subject->get_simple_commerce_product_by_item_id($item_id));
+  }
+
+
+  public function test__get_simple_commerce_product_by_item_id__returns_false_when_passed_invalid_item_id()
+  {
+    $item_id = 'NaN';
+
+    $this->EE->db->expectNever('select');
+    $this->EE->db->expectNever('from');
+    $this->EE->db->expectNever('join');
+    $this->EE->db->expectNever('where');
+    $this->EE->db->expectNever('get');
+  
+    $this->assertIdentical(FALSE,
+      $this->_subject->get_simple_commerce_product_by_item_id($item_id));
+  }
+
+
+  public function test__get_simple_commerce_product_by_item_id__returns_null_if_product_not_found()
+  {
+    $item_id    = 11;
+    $db_result  = $this->_get_mock('db_query');
+
+    $this->EE->db->expectOnce('select');
+    $this->EE->db->expectOnce('from');
+    $this->EE->db->expectOnce('join');
+    $this->EE->db->expectOnce('where');
+    $this->EE->db->expectOnce('get');
+    $this->EE->db->setReturnReference('get', $db_result);
+
+    $db_result->setReturnValue('num_rows', 0);
+    $db_result->expectNever('row');
+
+    $this->assertIdentical(NULL,
+      $this->_subject->get_simple_commerce_product_by_item_id($item_id));
+  }
+
+
+  public function test__get_simple_commerce_product_by_item_id__uses_cache_where_possible()
+  {
+    $item_id    = 11;
+    $products   = array(
+      (object) array(
+        'item_id'           => strval($item_id),
+        'item_regular_price' => '49.99',
+        'item_sale_price'   => '34.99',
+        'item_use_sale'     => 'y',
+        'title'             => 'Hat'
+      ),
+      (object) array(
+        'item_id'           => '12',
+        'item_regular_price' => '19.99',
+        'item_sale_price'   => '14.99',
+        'item_use_sale'     => 'n',
+        'title'             => 'Trousers'
+      )
+    );
+
+    // Manually set the cache.
+    $this->EE->session->cache[$this->_namespace][$this->_package_name]
+      ['products'] = $products;
+
+    // These should never be called.
+    $this->EE->db->expectNever('select');
+    $this->EE->db->expectNever('from');
+    $this->EE->db->expectNever('join');
+    $this->EE->db->expectNever('where');
+    $this->EE->db->expectNever('get');
+
+    // The second call should use the cache.
+    $this->assertIdentical($products[0],
+      $this->_subject->get_simple_commerce_product_by_item_id($item_id));
   }
 
 

@@ -20,11 +20,16 @@ class Simple_commerce_developer_module_model extends Simple_commerce_developer_m
    * Constructor.
    *
    * @access  public
+   * @param   string    $package_name       Package name. Used for testing.
+   * @param   string    $package_version    Package version. Used for testing.
+   * @param   string    $namespace          Session namespace. Used for testing.
    * @return  void
    */
-  public function __construct()
+  public function __construct($package_name = '', $package_version = '',
+    $namespace = ''
+  )
   {
-    parent::__construct();
+    parent::__construct($package_name, $package_version, $namespace);
   }
 
 
@@ -38,8 +43,27 @@ class Simple_commerce_developer_module_model extends Simple_commerce_developer_m
    */
   public function build_ipn_post_data($member_id, $product)
   {
+    // Get out early.
+    if ( ! valid_int($member_id, 1))
+    {
+      return FALSE;   // An exception might be better.
+    }
+
+    // Should really be using a custom datatype for the product.
+    if ( ! isset($product->item_id)
+      OR ! isset($product->item_regular_price)
+      OR ! isset($product->item_sale_price)
+      OR ! isset($product->item_use_sale)
+    )
+    {
+      return FALSE;
+    }
+
     // Retrieve the Simple Commerce seller email.
-    $seller = $this->EE->config->item('sc_paypal_account');
+    if ( ! $seller = $this->EE->config->item('sc_paypal_account'))
+    {
+      return FALSE;
+    }
 
     // Create some dummy values.
     $ipn_track_id = $this->_generate_random_string(22);
@@ -152,11 +176,56 @@ class Simple_commerce_developer_module_model extends Simple_commerce_developer_m
    *
    * @access  public
    * @param   int|string    $item_id    The Simple Commerce item ID.
-   * @return  StdClass
+   * @return  mixed
    */
   public function get_simple_commerce_product_by_item_id($item_id)
   {
-    
+    // Get out early. Should really throw an exception here.
+    if ( ! valid_int($item_id, 1))
+    {
+      return FALSE;
+    }
+
+    $item_id = (int) $item_id;
+
+    // Use the cache whenever possible.
+    $cache =& $this->_get_package_cache();
+
+    if (array_key_exists('products', $cache))
+    {
+      foreach ($cache['products'] AS $product)
+      {
+        if ((int) $product->item_id === $item_id)
+        {
+          return $product;
+        }
+      }
+
+      return NULL;
+    }
+
+    $fields = array(
+      'simple_commerce_items.item_id',
+      'simple_commerce_items.item_regular_price',
+      'simple_commerce_items.item_sale_price',
+      'simple_commerce_items.item_use_sale',
+      'channel_titles.title'
+    );
+
+    $db_result = $this->EE->db
+      ->select(implode(', ', $fields))
+      ->from('channel_titles')
+      ->join('simple_commerce_items',
+          'simple_commerce_items.entry_id = channel_titles.entry_id')
+      ->where('item_id', $item_id)
+      ->get();
+
+    if ( ! $db_result->num_rows())
+    {
+      return NULL;
+    }
+
+    return $db_result->row();
   }
 
 
