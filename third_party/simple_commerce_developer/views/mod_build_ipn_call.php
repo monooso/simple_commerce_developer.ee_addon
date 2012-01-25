@@ -6,13 +6,13 @@ $this->table->set_template($cp_pad_table_template);
 $this->table->set_heading(lang('th_setting'), lang('th_value'));
 
 $this->table->add_row(
-  form_label(lang('lbl_products'), 'products'),
-  form_dropdown('products', $products)
+  form_label(lang('lbl_products'), 'product_id'),
+  form_dropdown('product_id', $products)
 );
 
 $this->table->add_row(
-  form_label(lang('lbl_members'), 'members'),
-  form_dropdown('members', $members)
+  form_label(lang('lbl_members'), 'member_id'),
+  form_dropdown('member_id', $members)
 );
 
 echo $this->table->generate();
