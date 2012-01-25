@@ -132,6 +132,36 @@ class Simple_commerce_developer_module_model extends Simple_commerce_developer_m
 
 
   /**
+   * Calls the 'incoming_ipn' module ACTion, and inteprets the result.
+   *
+   * @access  public
+   * @param   array     $post_data    The POST data to send.
+   * @return  bool
+   */
+  public function execute_ipn_call(Array $post_data)
+  {
+    // Behold, the application of cunning.
+    $action_url = $this->EE->functions->fetch_site_index(TRUE, TRUE)
+      .'?ACT='
+      .$this->EE->cp->fetch_action_id($this->_package_name, 'incoming_ipn');
+
+    $ch = curl_init();
+
+    curl_setopt_array($ch, array(
+      CURLOPT_POST            => TRUE,
+      CURLOPT_POSTFIELDS      => $post_data,
+      CURLOPT_RETURNTRANSFER  => TRUE,
+      CURLOPT_URL             => $action_url
+    ));
+
+    $ipn_result = curl_exec($ch);
+    curl_close($ch);
+
+    return (stristr($ipn_result, 'success'));
+  }
+
+
+  /**
    * Returns an associative array of members. For example:
    *
    * array(
@@ -397,12 +427,11 @@ class Simple_commerce_developer_module_model extends Simple_commerce_developer_m
 
     // Bit of prep for the picking loop.
     $length         = (int) $length;
-    $source_length  = count($source);
+    $source_length  = strlen($source);
 
     for ($count = 0; $count < $length; $count++)
     {
-      $random_char = mt_rand(1, $source_length);
-      $return .= $source[$random_char - 1];
+      $return .= $source[mt_rand(0, $source_length - 1)];
     }
 
     return $return;
@@ -418,12 +447,10 @@ class Simple_commerce_developer_module_model extends Simple_commerce_developer_m
    */
   private function _install_actions($package_name)
   {
-    
     $this->EE->db->insert('actions', array(
       'class'   => $package_name,
-      'method'  => ''
+      'method'  => 'incoming_ipn'
     ));
-    
   }
 
 

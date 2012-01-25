@@ -8,12 +8,9 @@
  * @package         Simple_commerce_developer
  */
 
-require_once dirname(__FILE__) .'/classes/dummy_simple_commerce.php';
-
 class Simple_commerce_developer_mcp {
 
   private $EE;
-  private $_dummy_sc;
   private $_mod_model;
   private $_theme_url;
 
@@ -26,15 +23,11 @@ class Simple_commerce_developer_mcp {
    * Constructor.
    *
    * @access  public
-   * @param   Dummy_simple_commerce   $dummy_sc   Dummy_simple_commerce mock.
    * @return  void
    */
-  public function __construct(Dummy_simple_commerce $dummy_sc = NULL)
+  public function __construct()
   {
     $this->EE =& get_instance();
-
-    // Are we faking 'til we make it?
-    $this->_dummy_sc = $dummy_sc ? $dummy_sc : new Dummy_simple_commerce();
 
     $this->EE->load->add_package_path(
       PATH_THIRD .'simple_commerce_developer/');
@@ -172,26 +165,20 @@ class Simple_commerce_developer_mcp {
       return;
     }
 
-    /**
-     * Behold the application of cunning. Here's what we're up to:
-     *
-     * 1. Manually set the $_POST data array to our dummy IPN data. Note that 
-     *    this is usually terribly bad form, so don't just copy it blindly.
-     * 2. Create an instance of the sub-classed Simple Commerce class, which 
-     *    overrides the IPN validation checks.
-     * 3. Call the sub-classed Simple Commerce module's "incoming_ipn" action
-     *    method directly.
-     * 4. Stand back and admire the view.
-     */
+    if ($this->_mod_model->execute_ipn_call($ipn_data))
+    {
+      $this->EE->session->set_flashdata('message_success',
+        $this->EE->lang->line('fd__execute_ipn_call__call_successful'));
 
-    $_POST = $ipn_data;
-    $this->_dummy_sc->incoming_ipn();
+      $this->EE->functions->redirect($this->_base_url);
+    }
+    else
+    {
+      $this->EE->session->set_flashdata('message_failure',
+        $this->EE->lang->line('fd__execute_ipn_call__call_not_successful'));
 
-    // Return the result.
-    $this->EE->session->set_flashdata('message_success',
-      $this->EE->lang->line('fd__execute_ipn_call__call_sent'));
-
-    $this->EE->functions->redirect($this->_base_url);
+      $this->EE->functions->redirect($this->_base_url);
+    }
   }
 
 

@@ -449,7 +449,7 @@ class Test_simple_commerce_developer_module_model extends Testee_unit_test_case 
     
     $this->EE->db->expectAt(0 + 1, 'insert', array('actions', array(
       'class'   => ucfirst($package_name),
-      'method'  => ''
+      'method'  => 'incoming_ipn'
     )));
     
 

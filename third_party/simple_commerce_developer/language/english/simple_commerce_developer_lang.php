@@ -27,7 +27,8 @@ $lang = array(
   /* --------------------------------------------------------------
    * FLASHDATA
    * ------------------------------------------------------------ */
-  'fd__execute_ipn_call__call_sent'           => 'Fake PayPal IPN call sent',
+  'fd__execute_ipn_call__call_not_successful' => 'Unable to send fake PayPal IPN call',
+  'fd__execute_ipn_call__call_successful'     => 'Fake PayPal IPN call sent',
   'fd__execute_ipn_call__invalid_member_id'   => 'Invalid member ID $member_id',
   'fd__execute_ipn_call__invalid_product_id'  => 'Invalid product ID $product_id',
   'fd__execute_ipn_call__unable_to_build_ipn_data' => 'Unable to build IPN data',
