@@ -6,7 +6,7 @@
  * @author          Stephen Lewis (http://github.com/experience/)
  * @copyright       Experience Internet
  * @package         Simple_commerce_developer
- * @version         0.1.0
+ * @version         1.0.0
  */
 
 class Simple_commerce_developer_model extends CI_Model {
@@ -51,7 +51,7 @@ class Simple_commerce_developer_model extends CI_Model {
       ? strtolower($package_name) : 'simple_commerce_developer';
 
     $this->_package_version = $package_version
-      ? $package_version : '0.1.0';
+      ? $package_version : '1.0.0';
 
     // Initialise the add-on cache.
     if ( ! array_key_exists($this->_namespace, $this->EE->session->cache))
