@@ -130,14 +130,14 @@ class Simple_commerce_developer_mcp {
 
     if ( ! valid_int($member_id, 1))
     {
-      $failure_message
-        = $this->EE->lang->line('fd__execute_ipn_call__invalid_member_id');
+      $failure_message = str_replace('$member_id', $member_id,
+        $this->EE->lang->line('fd__execute_ipn_call__invalid_member_id'));
     }
 
     if ( ! valid_int($product_id, 1))
     {
-      $failure_message
-        = $this->EE->lang->line('fd__execute_ipn_call__invalid_product_id');
+      $failure_message = str_replace('$product_id', $product_id,
+        $this->EE->lang->line('fd__execute_ipn_call__invalid_product_id'));
     }
 
     if ($failure_message)
@@ -152,9 +152,10 @@ class Simple_commerce_developer_mcp {
       $product_id)
     )
     {
-      $this->EE->session->set_flashdata('message_failure',
+      $message = str_replace('$product_id', $product_id,
         $this->EE->lang->line('fd__execute_ipn_call__unknown_product'));
-      
+
+      $this->EE->session->set_flashdata('message_failure', $message);
       $this->EE->functions->redirect($this->_base_url);
       return;
     }
